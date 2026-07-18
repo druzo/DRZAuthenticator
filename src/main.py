@@ -6,6 +6,7 @@ A command-line tool for managing TOTP authentication keys and viewing dynamic pa
 
 import sys
 import os
+import argparse
 
 # Add src directory to Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -14,8 +15,13 @@ from totp_app import TOTPApp
 
 def main():
     """Main entry point for the TOTP application."""
+    parser = argparse.ArgumentParser(description="DRZ Authenticator")
+    parser.add_argument("--password", help="Master password (for scripting)")
+    
+    args = parser.parse_args()
+    
     try:
-        app = TOTPApp()
+        app = TOTPApp(password=args.password)
         app.run()
     except KeyboardInterrupt:
         print("\n\n[yellow]Application interrupted by user.[/yellow]")
