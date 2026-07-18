@@ -8,13 +8,13 @@ from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.align import Align
 from rich import print
-from totp_storage import TOTPStorage
+from totp_encrypted_storage import TOTPEncryptedStorage
 
 class TOTPApp:
     """Main TOTP application class with CLI interface."""
     
     def __init__(self):
-        self.storage = TOTPStorage()
+        self.storage = TOTPEncryptedStorage()
         self.console = Console()
         self.running = True
         self.language = "en"  # Default language
