@@ -34,5 +34,6 @@
     "table_header_status": "Status",
     "table_header_created": "Created At",
     "table_cell_valid": "Valid",
-    "table_cell_expired": "Expired"
+    "table_cell_expired": "Expired",
+    "nav_hint": "↑/↓ navigate • Enter select • q back"
 }

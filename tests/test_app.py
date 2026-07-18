@@ -38,17 +38,24 @@ def test_wait_for_enter():
     with patch('builtins.input', return_value=""):
         app.wait_for_enter()  # Should not raise exception
 
-@patch('totp_app.Console')
-def test_print_banner(mock_console_class):
+def test_print_banner():
     """Test banner printing."""
-    mock_console = Mock()
-    mock_console_class.return_value = mock_console
-    
-    app = TOTPApp()
-    app.print_banner()
-    
-    # Check that console.print was called with expected arguments
-    assert mock_console.print.called
+    from rich.panel import Panel
+    with patch('totp_app.render_banner_panel') as mock_render_banner:
+        mock_render_banner.return_value = Panel("banner")
+        app = TOTPApp()
+        app.print_banner()
+        mock_render_banner.assert_called_once()
+
+def test_banner_width_selection():
+    """Big art picked for wide terminals, small for narrow."""
+    from ui_theme import render_banner, BANNER_ART_BIG, BANNER_ART_SMALL
+    wide = render_banner(0.0, width=200)
+    narrow = render_banner(0.0, width=100)
+    wide_lines = len(str(wide).split("\n"))
+    narrow_lines = len(str(narrow).split("\n"))
+    assert wide_lines == len(BANNER_ART_BIG)
+    assert narrow_lines == len(BANNER_ART_SMALL)
 
 @patch('totp_app.open')
 def test_load_language_success(mock_open):
@@ -74,17 +81,16 @@ def test_get_text():
     result = app.get_text("nonexistent")
     assert result == "nonexistent"
 
-@patch('totp_app.Console')
-def test_display_menu(mock_console_class):
+@patch('totp_app.arrow_menu', return_value=0)
+def test_display_menu(mock_arrow_menu):
     """Test menu display."""
-    mock_console = Mock()
-    mock_console_class.return_value = mock_console
-    
     app = TOTPApp()
-    app.display_menu()
+    choice = app.display_menu()
     
-    # Should have printed the menu and banner
-    assert mock_console.print.call_count >= 2
+    # arrow_menu was called
+    mock_arrow_menu.assert_called_once()
+    # returned the key of the first item
+    assert choice == "1"
 
 @patch('totp_app.TOTPApp.ask_centered')
 @patch('totp_app.TOTPEncryptedStorage.add_key')
@@ -147,11 +153,11 @@ def test_handle_language_selection():
     
     # Test with multiple valid options
     app = TOTPApp()
-    with patch('totp_app.TOTPApp.ask_centered', side_effect=['1', '0']), \
+    with patch('totp_app.arrow_menu', side_effect=[0, -1]), \
          patch.object(app, 'clear_screen'), \
          patch.object(app, 'print_centered'), \
          patch('time.sleep'):
-        # This should complete without errors
+        # First call selects English (idx 0), second returns back
         app.handle_language_selection()
 
 def test_run_menu():
@@ -160,7 +166,7 @@ def test_run_menu():
     app = TOTPApp()
     
     # Mock the necessary methods
-    with patch.object(app, 'display_menu'), \
+    with patch.object(app, 'display_menu', return_value="0"), \
          patch('totp_app.TOTPApp.ask_centered', return_value="0"), \
          patch.object(app, 'print_centered'):
         # Should not raise exception

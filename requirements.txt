@@ -1,2 +1,3 @@
 pyotp==2.9.0
 rich==13.7.1
+readchar==4.2.2
