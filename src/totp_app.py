@@ -7,8 +7,13 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.align import Align
+from rich.box import ROUNDED
 from rich import print
 from totp_encrypted_storage import TOTPEncryptedStorage
+from ui_theme import (
+    PALETTE, make_console, render_banner_panel, styled_panel, arrow_menu,
+)
+from version import __version__
 
 class TOTPApp:
     """Main TOTP application class with CLI interface."""
@@ -17,7 +22,7 @@ class TOTPApp:
         self.storage = TOTPEncryptedStorage()
         # Store password for caching (not read from key.env anymore)
         self._password = password
-        self.console = Console()
+        self.console = make_console()
         self.running = True
         self.language = "en"  # Default language
         self.translations = {}
@@ -51,23 +56,23 @@ class TOTPApp:
         except (KeyboardInterrupt, EOFError):
             pass
     
-    def print_banner(self):
-        """Print a colorful big emphasized DRZ Authenticator banner."""
-        banner_lines = [
-            r"                      [bold red] ___   [/][bold orange3] ____  [/][bold yellow] _____ [/]",
-            r"                      [bold red]|  _ \ [/][bold orange3]|  _ \ [/][bold yellow]|__  / [/]",
-            r"                      [bold red]| | | |[/][bold orange3] |_) | [/][bold yellow]/ /   [/]",
-            r"                      [bold red]| |_| |[/][bold orange3]  _ <  [/][bold yellow]/ /_   [/]",
-            r"                      [bold red]|____/ [/][bold orange3]|_| \_ [/][bold yellow]\____| [/]",
-            r"",
-            r"[bold green3]    _         _   _    [/][bold cyan1]          _   _     [/][bold purple]         _            [/]",
-            r"[bold green3]   / \  _   _| |_| |__ [/][bold cyan1]  ___ _ _| |_(_) ___[/][bold purple]  __ _| |_ ___  _ __  [/]",
-            r"[bold green3]  / _ \| | | | __| '_ \ [/][bold cyan1] / _ \ '_| __| |/ __[/][bold purple]|/ _` | __/ _ \| '__| [/]",
-            r"[bold green3] / ___ \ |_| | |_| | |[/][bold cyan1]  __/ | | |_| | (__[/][bold purple]| (_| | || (_) | |    [/]",
-            r"[bold green3]/_/   \_\__,_|\__|_| |_[/][bold cyan1]|\___|_|  \__|_|\___[/][bold purple]|\__,_|\__\___/|_|    [/]"
+    def print_banner(self, phase: float = 0.0):
+        """Print the animated pastel-gradient DRZ AUTHENTICATOR banner."""
+        panel = render_banner_panel(phase)
+        self.console.print(Align.center(panel))
+
+    def menu_items(self):
+        """Build the (key, label) list for the main menu."""
+        return [
+            ("1", self.get_text("menu_option_1")),
+            ("2", self.get_text("menu_option_2")),
+            ("3", self.get_text("menu_option_3")),
+            ("4", self.get_text("menu_option_4")),
+            ("5", self.get_text("menu_option_5")),
+            ("6", "Options"),
+            ("7", self.get_text("menu_option_7")),
+            ("0", self.get_text("menu_option_0")),
         ]
-        banner_text = "\n".join(banner_lines)
-        self.console.print(Align.center(Panel(banner_text, style="bold magenta", border_style="cyan", padding=(1, 2), expand=False)))
     
     def load_language(self, lang_code):
         """Load translation file for specified language."""
@@ -93,34 +98,32 @@ class TOTPApp:
         self.load_language(lang_code)
     
     def display_menu(self):
-        """Display the main menu."""
+        """Display the main menu via animated arrow-key navigation. Returns chosen key or None."""
         self.clear_screen()
-        self.print_banner()
-        table = Table(title=self.get_text("menu_title"), show_header=False)
-        table.add_column("Option", style="cyan")
-        table.add_column("Description", style="magenta")
-        
-        table.add_row("1", self.get_text("menu_option_1"))
-        table.add_row("2", self.get_text("menu_option_2"))
-        table.add_row("3", self.get_text("menu_option_3"))
-        table.add_row("4", self.get_text("menu_option_4"))
-        table.add_row("5", self.get_text("menu_option_5"))
-        table.add_row("6", "Options")
-        table.add_row("7", self.get_text("menu_option_7"))  # Import from URI
-        table.add_row("0", self.get_text("menu_option_0"))
-        
-        self.console.print(Align.center(Panel(table, title="Main Menu", expand=False)))
+        items = self.menu_items()
+        nav_hint = self.get_text("nav_hint")
+        idx = arrow_menu(
+            self.console,
+            title=self.get_text("menu_title"),
+            items=items,
+            nav_hint=nav_hint,
+            version=__version__,
+        )
+        if idx < 0:
+            return "0"  # back/quit => exit
+        return items[idx][0]
     
     def add_key(self):
         """Add a new authentication key."""
         self.clear_screen()
+        self.print_banner()
         self.print_centered(self.get_text("status_add_key"))
         print()  # Add an empty line for breathing room
         
         name = self.ask_centered(self.get_text("prompt_key_name"))
         if not name.strip():
             print()
-            self.print_centered(f"[red]{self.get_text('error_empty_name')}[/red]")
+            self.print_centered(f"[err]{self.get_text('error_empty_name')}[/err]")
             time.sleep(2)
             return
             
@@ -128,83 +131,107 @@ class TOTPApp:
         secret = self.ask_centered(self.get_text("prompt_secret"))
         if not secret.strip():
             print()
-            self.print_centered(f"[red]{self.get_text('error_empty_secret')}[/red]")
+            self.print_centered(f"[err]{self.get_text('error_empty_secret')}[/err]")
             time.sleep(2)
             return
             
         print()
         if self.storage.add_key(name, secret):
-            self.print_centered(f"[green]Successfully added key: {name}[/green]")
+            self.print_centered(f"[ok]Successfully added key: {name}[/ok]")
         else:
-            self.print_centered(f"[red]{self.get_text('error_duplicate_key').format(name=name)}[/red]")
+            self.print_centered(f"[err]{self.get_text('error_duplicate_key').format(name=name)}[/err]")
             
         time.sleep(2)
     
     def show_passwords(self):
         """Display all passwords with dynamic updates."""
         self.clear_screen()
+        self.print_banner()
         self.print_centered(self.get_text("status_show_passwords"))
         
         keys = self.storage.get_keys()
         if not keys:
-            self.print_centered(f"[yellow]{self.get_text('error_no_keys_found')}[/yellow]")
+            self.print_centered(f"[warn]{self.get_text('error_no_keys_found')}[/warn]")
             time.sleep(2)
             return
             
-        while True:
-            self.clear_screen()
-            self.print_centered(self.get_text("status_show_passwords_dynamic"))
-            print()
-            
-            # Create table for current passwords
-            table = Table(title=self.get_text("table_header_name"), show_header=True, header_style="bold magenta")
-            table.add_column(self.get_text("table_header_name"), style="cyan")
-            table.add_column(self.get_text("table_header_password"), style="green")
-            table.add_column(self.get_text("table_header_expires"), style="yellow")
-            table.add_column(self.get_text("table_header_status"), style="blue")
-            
-            updated = False
-            for key in keys:
+        try:
+            while True:
+                self.clear_screen()
+                self.print_banner()
+                self.print_centered(self.get_text("status_show_passwords_dynamic"))
+                print()
+                
+                # Create table for current passwords
+                table = Table(
+                    title=self.get_text("table_header_name"),
+                    show_header=True,
+                    header_style=f"bold {PALETTE['lavender']}",
+                    border_style=PALETTE["border"],
+                    box=ROUNDED,
+                    style=f"on {PALETTE['panel']}",
+                )
+                table.add_column(self.get_text("table_header_name"), style=PALETTE["sky"])
+                table.add_column(self.get_text("table_header_password"), style=f"bold {PALETTE['mint']}")
+                table.add_column(self.get_text("table_header_expires"), style=PALETTE["lavender"])
+                table.add_column(self.get_text("table_header_status"), style=PALETTE["peach"])
+                
+                updated = False
+                for key in keys:
+                    try:
+                        totp = pyotp.TOTP(key['secret'])
+                        password = totp.now()
+                        remaining = 30 - (int(time.time()) % 30)
+                        # pastel progress bar for the countdown
+                        bar_len = 16
+                        filled = int(bar_len * remaining / 30)
+                        bar = "[" + "█" * filled + "░" * (bar_len - filled) + f"] {remaining:02d}s"
+                        status = self.get_text("table_cell_valid") if remaining > 0 else self.get_text("table_cell_expired")
+                        
+                        table.add_row(
+                            key['name'],
+                            password,
+                            bar,
+                            status
+                        )
+                        updated = True
+                    except Exception as e:
+                        table.add_row(key['name'], "[err]Error[/err]", "N/A", f"[err]{str(e)}[/err]")
+                
+                self.console.print(Align.center(table))
+                
+                if not updated:
+                    self.print_centered(f"[warn]{self.get_text('error_no_passwords')}[/warn]")
+                
                 try:
-                    totp = pyotp.TOTP(key['secret'])
-                    password = totp.now()
-                    remaining = 30 - (int(time.time()) % 30)
-                    status = self.get_text("table_cell_valid") if remaining > 0 else self.get_text("table_cell_expired")
-                    
-                    table.add_row(
-                        key['name'],
-                        password,
-                        f"{remaining}s",
-                        status
-                    )
-                    updated = True
-                except Exception as e:
-                    table.add_row(key['name'], "[red]Error[/red]", "N/A", f"[red]{str(e)}[/red]")
-            
-            self.console.print(Align.center(table))
-            
-            if not updated:
-                self.print_centered(f"[yellow]{self.get_text('error_no_passwords')}[/yellow]")
-            
-            try:
-                time.sleep(1)  # Update every second to show countdown
-                # Check if user wants to exit (Ctrl+C)
-            except KeyboardInterrupt:
-                break
+                    time.sleep(1)  # Update every second to show countdown
+                    # Check if user wants to exit (Ctrl+C)
+                except KeyboardInterrupt:
+                    break
+        except KeyboardInterrupt:
+            return
     
     def list_keys(self):
         """List all stored keys."""
         self.clear_screen()
+        self.print_banner()
         self.print_centered(self.get_text("status_list_keys"))
         print()
         
         keys = self.storage.get_keys()
         if not keys:
-            self.print_centered(f"[yellow]{self.get_text('error_no_keys_found')}[/yellow]")
+            self.print_centered(f"[warn]{self.get_text('error_no_keys_found')}[/warn]")
         else:
-            table = Table(title=self.get_text("table_header_name"), show_header=True, header_style="bold magenta")
-            table.add_column(self.get_text("table_header_name"), style="cyan")
-            table.add_column(self.get_text("table_header_created"), style="green")
+            table = Table(
+                title=self.get_text("table_header_name"),
+                show_header=True,
+                header_style=f"bold {PALETTE['lavender']}",
+                border_style=PALETTE["border"],
+                box=ROUNDED,
+                style=f"on {PALETTE['panel']}",
+            )
+            table.add_column(self.get_text("table_header_name"), style=PALETTE["sky"])
+            table.add_column(self.get_text("table_header_created"), style=PALETTE["mint"])
             
             for key in keys:
                 table.add_row(key['name'], key['created_at'])
@@ -216,19 +243,27 @@ class TOTPApp:
     def remove_key(self):
         """Remove an existing key."""
         self.clear_screen()
+        self.print_banner()
         self.print_centered(self.get_text("status_remove_key"))
         print()
         
         keys = self.storage.get_keys()
         if not keys:
-            self.print_centered(f"[yellow]{self.get_text('error_no_keys_found')}[/yellow]")
+            self.print_centered(f"[warn]{self.get_text('error_no_keys_found')}[/warn]")
             time.sleep(2)
             return
             
         # Display available keys
-        table = Table(title=self.get_text("table_header_name"), show_header=True, header_style="bold magenta")
-        table.add_column(self.get_text("table_header_name"), style="cyan")
-        table.add_column(self.get_text("table_header_created"), style="green")
+        table = Table(
+            title=self.get_text("table_header_name"),
+            show_header=True,
+            header_style=f"bold {PALETTE['lavender']}",
+            border_style=PALETTE["border"],
+            box=ROUNDED,
+            style=f"on {PALETTE['panel']}",
+        )
+        table.add_column(self.get_text("table_header_name"), style=PALETTE["sky"])
+        table.add_column(self.get_text("table_header_created"), style=PALETTE["mint"])
         
         for key in keys:
             table.add_row(key['name'], key.get('created_at', 'Unknown'))
@@ -240,21 +275,22 @@ class TOTPApp:
         print()
         
         if self.storage.remove_key(name):
-            self.print_centered(f"[green]Successfully removed key: {name}[/green]")
+            self.print_centered(f"[ok]Successfully removed key: {name}[/ok]")
         else:
-            self.print_centered(f"[red]{self.get_text('error_key_not_found').format(name=name)}[/red]")
+            self.print_centered(f"[err]{self.get_text('error_key_not_found').format(name=name)}[/err]")
             
         time.sleep(2)
     
     def show_help(self):
         """Display help information."""
         self.clear_screen()
+        self.print_banner()
         self.print_centered(self.get_text("status_help"))
         print()
         
         help_text = self.get_text("help_text")
         
-        self.console.print(Align.center(Panel(help_text, expand=False)))
+        self.console.print(Align.center(styled_panel(help_text)))
         self.wait_for_enter()
     
     def import_key(self):
@@ -279,18 +315,18 @@ class TOTPApp:
                         decoded_objects = pyzbar.decode(image)
                         
                         if not decoded_objects:
-                            self.print_centered("[red]No QR Code found in image[/red]")
+                            self.print_centered("[err]No QR Code found in image[/err]")
                             return
                         
                         uri = decoded_objects[0].data.decode('utf-8')
-                        self.print_centered(f"[green]URI extracted from QR code: {uri}[/green]")
+                        self.print_centered(f"[ok]URI extracted from QR code: {uri}[/ok]")
                         
                 except Exception as e:
                     # Not critical - just print error and prompt for URI
                     print(f"Error reading QR image: {e}")
             
             if not uri.strip():
-                self.print_centered("[red]No URI provided or scanned. Operation cancelled.[/red]")
+                self.print_centered("[err]No URI provided or scanned. Operation cancelled.[/err]")
                 return
     
             # Parse URI using pyotp            
@@ -301,8 +337,8 @@ class TOTPApp:
             secret = totp.secret 
             issuer = totp.issuer
             
-            self.print_centered(f"[green]Importing: {name}[/green]")
-            self.print_centered(f"[green]Secret: {secret}[/green]")
+            self.print_centered(f"[ok]Importing: {name}[/ok]")
+            self.print_centered(f"[label]Secret:[/label] [value]{secret}[/value]")
             
             # If name was not provided in URI, suggest one
             if not name:
@@ -313,62 +349,53 @@ class TOTPApp:
             # Add to storage  
             success = self.storage.add_key(name, secret)
             if success:
-                self.print_centered(f"[green]Successfully imported '{name}'[/green]")
+                self.print_centered(f"[ok]Successfully imported '{name}'[/ok]")
             else:
-                self.print_centered("[red]Failed to import (may already exist)![/red]")
+                self.print_centered("[err]Failed to import (may already exist)![/err]")
         
         except ImportError:
             # pyotp not installed - fallback
-            self.print_centered("[red]pyotp required for URI parsing. Please install first.[/red]") 
+            self.print_centered("[err]pyotp required for URI parsing. Please install first.[/err]") 
             return
         except Exception as e:
-            self.print_centered(f"[red]Import failed: {e}[/red]")
+            self.print_centered(f"[err]Import failed: {e}[/err]")
     
     def handle_language_selection(self):
-        """Handle language selection."""
-        while True:
-            self.clear_screen()
-            table = Table(title="Select Language", show_header=False)
-            table.add_column("Option", style="cyan")
-            table.add_column("Language", style="magenta")
-            
-            table.add_row("1", "English")
-            table.add_row("2", "Português")
-            table.add_row("3", "Español")
-            table.add_row("0", "Back to Main Menu")
-            
-            self.console.print(Align.center(Panel(table, title="Language Selection", expand=False)))
-            print()
-            choice = self.ask_centered("Select a language", default="0")
-            print()
-            
-            if choice == "1":
-                self.set_language("en")
-                self.print_centered("[green]Language changed to English[/green]")
-                time.sleep(1)
-                break
-            elif choice == "2":
-                self.set_language("pt")
-                self.print_centered("[green]Idioma alterado para Português[/green]")
-                time.sleep(1)
-                break
-            elif choice == "3":
-                self.set_language("es")
-                self.print_centered("[green]Idioma cambiado a Español[/green]")
-                time.sleep(1)
-                break
-            elif choice == "0":
-                break
-            else:
-                self.print_centered("[red]Invalid option. Please try again.[/red]")
-                time.sleep(2)
+        """Handle language selection via arrow-key menu."""
+        items = [
+            ("1", "English"),
+            ("2", "Português"),
+            ("3", "Español"),
+            ("0", self.get_text("menu_option_0")),
+        ]
+        nav_hint = self.get_text("nav_hint")
+        idx = arrow_menu(
+            self.console,
+            title="Select Language / Idioma / Idioma",
+            items=items,
+            nav_hint=nav_hint,
+        )
+        if idx < 0:
+            return
+        choice = items[idx][0]
+        
+        if choice == "1":
+            self.set_language("en")
+            self.print_centered("[ok]Language changed to English[/ok]")
+            time.sleep(1)
+        elif choice == "2":
+            self.set_language("pt")
+            self.print_centered("[ok]Idioma alterado para Português[/ok]")
+            time.sleep(1)
+        elif choice == "3":
+            self.set_language("es")
+            self.print_centered("[ok]Idioma cambiado a Español[/ok]")
+            time.sleep(1)
     
     def run(self):
         """Main application loop."""
         while self.running:
-            self.display_menu()
-            print()
-            choice = self.ask_centered(self.get_text("prompt_select_option"), default="0")
+            choice = self.display_menu()
             print()
             
             if choice == "1":
