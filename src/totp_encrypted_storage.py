@@ -65,7 +65,7 @@ class TOTPEncryptedStorage:
             print(f"Warning: Could not save keys - {e}")
             return False
     
-    def add_key(self, name: str, secret: str) -> bool:
+    def add_key(self, name: str, secret: str, digits: int = 6, period: int = 30) -> bool:
         """Add a new TOTP key."""
         # Validate secret before adding it
         if not self.validate_secret(secret):
@@ -81,7 +81,9 @@ class TOTPEncryptedStorage:
         new_key = {
             'name': name,
             'secret': secret,
-            'created_at': datetime.now().isoformat()
+            'created_at': datetime.now().isoformat(),
+            'digits': digits,
+            'period': period
         }
         
         keys.append(new_key)

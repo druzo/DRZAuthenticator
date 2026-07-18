@@ -106,6 +106,7 @@ class TOTPApp:
         table.add_row("4", self.get_text("menu_option_4"))
         table.add_row("5", self.get_text("menu_option_5"))
         table.add_row("6", "Options")
+        table.add_row("7", self.get_text("menu_option_7"))  # Import from URI
         table.add_row("0", self.get_text("menu_option_0"))
         
         self.console.print(Align.center(Panel(table, title="Main Menu", expand=False)))
@@ -256,6 +257,73 @@ class TOTPApp:
         self.console.print(Align.center(Panel(help_text, expand=False)))
         self.wait_for_enter()
     
+    def import_key(self):
+        """Import a key from an otpauth URI or QR code image."""
+        try:
+            from pyotp import parse_uri
+            # Ask for URL or paste URI  
+            uri = self.ask_centered("Paste OTP URI (otpauth://) or press Enter to scan QR code")
+            
+            if not uri.strip():
+                # Try to read QR code from image
+                try:
+                    from pyzbar import pyzbar
+                    import cv2
+                    
+                    # Prompt for image file    
+                    img_path = self.ask_centered("Enter image path containing QR code (or press Enter to skip)")
+                    
+                    if img_path.strip():
+                        # Read image
+                        image = cv2.imread(img_path)
+                        decoded_objects = pyzbar.decode(image)
+                        
+                        if not decoded_objects:
+                            self.print_centered("[red]No QR Code found in image[/red]")
+                            return
+                        
+                        uri = decoded_objects[0].data.decode('utf-8')
+                        self.print_centered(f"[green]URI extracted from QR code: {uri}[/green]")
+                        
+                except Exception as e:
+                    # Not critical - just print error and prompt for URI
+                    print(f"Error reading QR image: {e}")
+            
+            if not uri.strip():
+                self.print_centered("[red]No URI provided or scanned. Operation cancelled.[/red]")
+                return
+    
+            # Parse URI using pyotp            
+            totp = parse_uri(uri)
+            
+            # Extract key components
+            name = totp.name
+            secret = totp.secret 
+            issuer = totp.issuer
+            
+            self.print_centered(f"[green]Importing: {name}[/green]")
+            self.print_centered(f"[green]Secret: {secret}[/green]")
+            
+            # If name was not provided in URI, suggest one
+            if not name:
+                name = self.ask_centered("Enter key name (or press Enter to use secret):")
+                if not name.strip():
+                    name = secret[:8]
+            
+            # Add to storage  
+            success = self.storage.add_key(name, secret)
+            if success:
+                self.print_centered(f"[green]Successfully imported '{name}'[/green]")
+            else:
+                self.print_centered("[red]Failed to import (may already exist)![/red]")
+        
+        except ImportError:
+            # pyotp not installed - fallback
+            self.print_centered("[red]pyotp required for URI parsing. Please install first.[/red]") 
+            return
+        except Exception as e:
+            self.print_centered(f"[red]Import failed: {e}[/red]")
+    
     def handle_language_selection(self):
         """Handle language selection."""
         while True:
@@ -315,6 +383,8 @@ class TOTPApp:
                 self.show_help()
             elif choice == "6":
                 self.handle_language_selection()
+            elif choice == "7":
+                self.import_key()
             elif choice == "0":
                 self.print_centered(self.get_text("message_goodbye"))
                 self.running = False
