@@ -13,8 +13,10 @@ from totp_encrypted_storage import TOTPEncryptedStorage
 class TOTPApp:
     """Main TOTP application class with CLI interface."""
     
-    def __init__(self):
+    def __init__(self, password: str = None):
         self.storage = TOTPEncryptedStorage()
+        # Store password for caching (not read from key.env anymore)
+        self._password = password
         self.console = Console()
         self.running = True
         self.language = "en"  # Default language

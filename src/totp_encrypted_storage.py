@@ -3,16 +3,39 @@ import os
 from datetime import datetime
 from typing import List, Dict, Optional
 from encryption_utils import load_encrypted_keys, save_encrypted_keys
+import pyotp
 
 class TOTPEncryptedStorage:
     """Handles storage and retrieval of TOTP keys in encrypted JSON format."""
     
-    def __init__(self, filename: str = "totp_keys.json"):
+    def __init__(self, filename: str = "totp_keys.json", password: str = None):
         self.filename = filename
         self.keys_file = os.path.join(os.path.dirname(__file__), filename)
+        # Store password if provided (for caching session-wide)
+        self._password = password
         
+    def validate_secret(self, secret: str) -> bool:
+        """Validate that a TOTP secret is base32 encoded and valid."""
+        secret = secret.strip().replace(" ", "")
+        if not secret:
+            return False
+            
+        # Check the secret for basic valid base32 chars and length  
+        import re
+        if not re.match(r'^[A-Z2-7=]+$', secret):
+            return False
+            
+        try:
+            # Try with pyotp to make sure it's not malformed
+            pyotp.TOTP(secret)
+            return True
+        except Exception:
+            return False
+    
     def _get_password(self) -> str:
-        """Prompt for password on each operation to avoid caching issues."""
+        """Get password: from cache or prompt if needed."""
+        if self._password is not None:
+            return self._password
         # from rich.prompt import Prompt
         try:
             with open(os.path.join(os.path.dirname(__file__), "key.env"), "r") as f:
@@ -44,6 +67,10 @@ class TOTPEncryptedStorage:
     
     def add_key(self, name: str, secret: str) -> bool:
         """Add a new TOTP key."""
+        # Validate secret before adding it
+        if not self.validate_secret(secret):
+            return False
+        
         keys = self.load_keys()
         
         # Check if key with this name already exists
