@@ -1,4 +1,6 @@
 import time
+import json
+import os
 import pyotp
 from rich.console import Console
 from rich.table import Table
@@ -14,72 +16,96 @@ class TOTPApp:
         self.storage = TOTPStorage()
         self.console = Console()
         self.running = True
+        self.language = "en"  # Default language
+        self.translations = {}
+        self.load_language(self.language)
     
     def clear_screen(self):
         """Clear the terminal screen."""
         self.console.clear()
     
+    def load_language(self, lang_code):
+        """Load translation file for specified language."""
+        try:
+            with open(f"src/lang_{lang_code}.json", 'r', encoding='utf-8') as f:
+                self.translations = json.load(f)
+        except FileNotFoundError:
+            # Fallback to English if requested language file not found
+            print(f"[yellow]Translation file for {lang_code} not found, falling back to English[/yellow]")
+            with open("src/lang_en.json", 'r', encoding='utf-8') as f:
+                self.translations = json.load(f)
+    
+    def get_text(self, key):
+        """Get translated text for a given key."""
+        return self.translations.get(key, key)  # fallback to key if not found
+    
+    def set_language(self, lang_code):
+        """Set the current language and reload translations."""
+        self.language = lang_code
+        self.load_language(lang_code)
+    
     def display_menu(self):
         """Display the main menu."""
         self.clear_screen()
-        table = Table(title="TOTP Application Menu", show_header=False)
+        table = Table(title=self.get_text("menu_title"), show_header=False)
         table.add_column("Option", style="cyan")
         table.add_column("Description", style="magenta")
         
-        table.add_row("1", "Add New Authentication Key")
-        table.add_row("2", "Show All Passwords (Dynamic)")
-        table.add_row("3", "List All Keys")
-        table.add_row("4", "Remove Key")
-        table.add_row("5", "Help")
-        table.add_row("0", "Exit")
+        table.add_row("1", self.get_text("menu_option_1"))
+        table.add_row("2", self.get_text("menu_option_2"))
+        table.add_row("3", self.get_text("menu_option_3"))
+        table.add_row("4", self.get_text("menu_option_4"))
+        table.add_row("5", self.get_text("menu_option_5"))
+        table.add_row("6", "Options")
+        table.add_row("0", self.get_text("menu_option_0"))
         
         self.console.print(Panel(table, title="Main Menu"))
     
     def add_key(self):
         """Add a new authentication key."""
         self.clear_screen()
-        print("[bold blue]Add New Authentication Key[/bold blue]")
+        print(self.get_text("status_add_key"))
         
-        name = Prompt.ask("Enter key name")
+        name = Prompt.ask(self.get_text("prompt_key_name"))
         if not name.strip():
-            print("[red]Key name cannot be empty![/red]")
+            print(f"[red]{self.get_text('error_empty_name')}[/red]")
             time.sleep(2)
             return
             
-        secret = Prompt.ask("Enter base32 secret")
+        secret = Prompt.ask(self.get_text("prompt_secret"))
         if not secret.strip():
-            print("[red]Secret cannot be empty![/red]")
+            print(f"[red]{self.get_text('error_empty_secret')}[/red]")
             time.sleep(2)
             return
             
         if self.storage.add_key(name, secret):
             print(f"[green]Successfully added key: {name}[/green]")
         else:
-            print(f"[red]Failed to add key: {name} (already exists)[/red]")
+            print(f"[red]{self.get_text('error_duplicate_key').format(name=name)}[/red]")
             
         time.sleep(2)
     
     def show_passwords(self):
         """Display all passwords with dynamic updates."""
         self.clear_screen()
-        print("[bold blue]Current TOTP Passwords[/bold blue]")
+        print(self.get_text("status_show_passwords"))
         
         keys = self.storage.get_keys()
         if not keys:
-            print("[yellow]No keys found. Add some keys first.[/yellow]")
+            print(f"[yellow]{self.get_text('error_no_keys_found')}[/yellow]")
             time.sleep(2)
             return
             
         while True:
             self.clear_screen()
-            print("[bold blue]Current TOTP Passwords (Auto-updating) - Press Ctrl+C to return[/bold blue]")
+            print(self.get_text("status_show_passwords_dynamic"))
             
             # Create table for current passwords
-            table = Table(title="TOTP Keys", show_header=True, header_style="bold magenta")
-            table.add_column("Name", style="cyan")
-            table.add_column("Password", style="green")
-            table.add_column("Expires In", style="yellow")
-            table.add_column("Status", style="blue")
+            table = Table(title=self.get_text("table_header_name"), show_header=True, header_style="bold magenta")
+            table.add_column(self.get_text("table_header_name"), style="cyan")
+            table.add_column(self.get_text("table_header_password"), style="green")
+            table.add_column(self.get_text("table_header_expires"), style="yellow")
+            table.add_column(self.get_text("table_header_status"), style="blue")
             
             updated = False
             for key in keys:
@@ -87,7 +113,7 @@ class TOTPApp:
                     totp = pyotp.TOTP(key['secret'])
                     password = totp.now()
                     remaining = 30 - (int(time.time()) % 30)
-                    status = "Valid" if remaining > 0 else "Expired"
+                    status = self.get_text("table_cell_valid") if remaining > 0 else self.get_text("table_cell_expired")
                     
                     table.add_row(
                         key['name'],
@@ -102,7 +128,7 @@ class TOTPApp:
             self.console.print(table)
             
             if not updated:
-                print("[yellow]No valid passwords to display.[/yellow]")
+                print(f"[yellow]{self.get_text('error_no_passwords')}[/yellow]")
             
             try:
                 time.sleep(1)  # Update every second to show countdown
@@ -113,15 +139,15 @@ class TOTPApp:
     def list_keys(self):
         """List all stored keys."""
         self.clear_screen()
-        print("[bold blue]Stored TOTP Keys[/bold blue]")
+        print(self.get_text("status_list_keys"))
         
         keys = self.storage.get_keys()
         if not keys:
-            print("[yellow]No keys found.[/yellow]")
+            print(f"[yellow]{self.get_text('error_no_keys_found')}[/yellow]")
         else:
-            table = Table(title="TOTP Keys", show_header=True, header_style="bold magenta")
-            table.add_column("Name", style="cyan")
-            table.add_column("Created At", style="green")
+            table = Table(title=self.get_text("table_header_name"), show_header=True, header_style="bold magenta")
+            table.add_column(self.get_text("table_header_name"), style="cyan")
+            table.add_column(self.get_text("table_header_created"), style="green")
             
             for key in keys:
                 table.add_row(key['name'], key['created_at'])
@@ -133,62 +159,85 @@ class TOTPApp:
     def remove_key(self):
         """Remove an existing key."""
         self.clear_screen()
-        print("[bold blue]Remove Authentication Key[/bold blue]")
+        print(self.get_text("status_remove_key"))
         
         keys = self.storage.get_keys()
         if not keys:
-            print("[yellow]No keys found.[/yellow]")
+            print(f"[yellow]{self.get_text('error_no_keys_found')}[/yellow]")
             time.sleep(2)
             return
             
         # Display available keys
-        table = Table(title="Available Keys", show_header=True, header_style="bold magenta")
-        table.add_column("Name", style="cyan")
-        table.add_column("Created At", style="green")
+        table = Table(title=self.get_text("table_header_name"), show_header=True, header_style="bold magenta")
+        table.add_column(self.get_text("table_header_name"), style="cyan")
+        table.add_column(self.get_text("table_header_created"), style="green")
         
         for i, key in enumerate(keys):
             table.add_row(key['name'], key['created_at'])
             
         self.console.print(table)
         
-        name = Prompt.ask("\nEnter the name of the key to remove")
+        name = Prompt.ask(self.get_text("prompt_remove_key"))
         
         if self.storage.remove_key(name):
             print(f"[green]Successfully removed key: {name}[/green]")
         else:
-            print(f"[red]Key '{name}' not found![/red]")
+            print(f"[red]{self.get_text('error_key_not_found').format(name=name)}[/red]")
             
         time.sleep(2)
     
     def show_help(self):
         """Display help information."""
         self.clear_screen()
-        print("[bold blue]TOTP Application Help[/bold blue]")
+        print(self.get_text("status_help"))
         
-        help_text = """
-This application manages Time-based One-Time Passwords (TOTP) for multi-factor authentication.
-Features:
-- Add new authentication keys with custom names
-- View dynamic passwords that automatically update every 30 seconds
-- List all stored keys
-- Remove existing keys
-
-Requirements:
-- Base32 encoded secrets for TOTP generation
-- All data is stored in a JSON file called 'totp_keys.json'
-
-For more information about TOTP:
-https://en.wikipedia.org/wiki/Time-based_one-time_password
-        """
+        help_text = self.get_text("help_text")
         
         self.console.print(Panel(help_text))
         input("\nPress Enter to continue...")
+    
+    def handle_language_selection(self):
+        """Handle language selection."""
+        while True:
+            self.clear_screen()
+            table = Table(title="Select Language", show_header=False)
+            table.add_column("Option", style="cyan")
+            table.add_column("Language", style="magenta")
+            
+            table.add_row("1", "English")
+            table.add_row("2", "Português")
+            table.add_row("3", "Español")
+            table.add_row("0", "Back to Main Menu")
+            
+            self.console.print(Panel(table, title="Language Selection"))
+            choice = Prompt.ask("Select a language", default="0")
+            
+            if choice == "1":
+                self.set_language("en")
+                print("[green]Language changed to English[/green]")
+                time.sleep(1)
+                break
+            elif choice == "2":
+                self.set_language("pt")
+                print("[green]Idioma alterado para Português[/green]")
+                time.sleep(1)
+                break
+            elif choice == "3":
+                self.set_language("es")
+                print("[green]Idioma cambiado a Español[/green]")
+                time.sleep(1)
+                break
+            elif choice == "0":
+                break
+            else:
+                print("[red]Invalid option. Please try again.[/red]")
+                time.sleep(2)
     
     def run(self):
         """Main application loop."""
         while self.running:
             self.display_menu()
-            choice = Prompt.ask("Select an option", default="0")
+            choice = Prompt.ask(self.get_text("prompt_select_option"), default="0")
             
             if choice == "1":
                 self.add_key()
@@ -200,9 +249,11 @@ https://en.wikipedia.org/wiki/Time-based_one-time_password
                 self.remove_key()
             elif choice == "5":
                 self.show_help()
+            elif choice == "6":
+                self.handle_language_selection()
             elif choice == "0":
-                print("[yellow]Goodbye![/yellow]")
+                print(self.get_text("message_goodbye"))
                 self.running = False
             else:
-                print("[red]Invalid option. Please try again.[/red]")
+                print(self.get_text("error_invalid_option"))
                 time.sleep(2)
