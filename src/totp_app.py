@@ -13,6 +13,7 @@ from totp_encrypted_storage import TOTPEncryptedStorage
 from ui_theme import (
     PALETTE, make_console, render_banner_panel, styled_panel, arrow_menu,
 )
+from version import __version__
 
 class TOTPApp:
     """Main TOTP application class with CLI interface."""
@@ -106,6 +107,7 @@ class TOTPApp:
             title=self.get_text("menu_title"),
             items=items,
             nav_hint=nav_hint,
+            version=__version__,
         )
         if idx < 0:
             return "0"  # back/quit => exit

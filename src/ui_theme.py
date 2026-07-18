@@ -149,6 +149,7 @@ def _render_menu_items(
     items: List[Tuple[str, str]],
     selected: int,
     nav_hint: str,
+    version: Optional[str] = None,
 ) -> Table:
     """Render the menu list as a table with a cursor on the selected row."""
     table = Table(show_header=False, box=None, padding=(0, 2), expand=False)
@@ -170,6 +171,10 @@ def _render_menu_items(
         table.add_row(cursor_text, idx_text_obj, label_text)
     # hint row
     table.add_row("", "", Text(nav_hint, style=f"italic {PALETTE['text_dim']}"))
+    # version footer row (right-aligned, dim italic pastel)
+    if version:
+        version_text = Text(f"Version: {version}", style=f"italic {PALETTE['lavender']}")
+        table.add_row("", "", Align.right(version_text))
     return table
 
 
@@ -179,10 +184,11 @@ def _composite_frame(
     nav_hint: str,
     title: str,
     phase: float,
+    version: Optional[str] = None,
 ) -> Group:
     """Build one full frame: animated banner + menu panel."""
     banner = render_banner_panel(phase)
-    menu_table = _render_menu_items(items, selected, nav_hint)
+    menu_table = _render_menu_items(items, selected, nav_hint, version=version)
     menu_panel = Panel(
         Align.center(menu_table, vertical="middle"),
         title=f"[title]{title}[/title]",
@@ -203,11 +209,13 @@ def arrow_menu(
     nav_hint: str = "",
     selected: int = 0,
     fps: float = 12.0,
+    version: Optional[str] = None,
 ) -> int:
     """Render an animated banner + arrow-key menu. Returns chosen index.
 
     `items`: list of (key, label). Returns index of chosen item, or -1 for back/quit.
     Keys: ↑/↓ navigate, Enter select, q/Esc/← back (returns -1).
+    `version`: optional version string shown as footer in the menu panel.
     """
     if not items:
         return -1
@@ -223,7 +231,7 @@ def arrow_menu(
 
     try:
         with Live(
-            _composite_frame(items, selected, nav_hint, title, phase),
+            _composite_frame(items, selected, nav_hint, title, phase, version=version),
             console=console,
             refresh_per_second=fps,
             transient=True,
@@ -232,7 +240,7 @@ def arrow_menu(
             while True:
                 # animate phase
                 phase = (phase + period * 0.25) % 1.0
-                live.update(_composite_frame(items, selected, nav_hint, title, phase))
+                live.update(_composite_frame(items, selected, nav_hint, title, phase, version=version))
 
                 # poll key — readchar blocks until a key is pressed.
                 key = readchar.readkey()
