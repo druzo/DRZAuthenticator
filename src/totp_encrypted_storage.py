@@ -13,8 +13,14 @@ class TOTPEncryptedStorage:
         
     def _get_password(self) -> str:
         """Prompt for password on each operation to avoid caching issues."""
-        from rich.prompt import Prompt
-        return Prompt.ask("Enter encryption password", password=True)
+        # from rich.prompt import Prompt
+        try:
+            with open(os.path.join(os.path.dirname(__file__), "key.env"), "r") as f:
+                return f.read().strip()
+        except FileNotFoundError:
+            # Fallback to prompting if file not found
+            from rich.prompt import Prompt
+            return Prompt.ask("Enter encryption password", password=True)
     
     def load_keys(self) -> List[Dict]:
         """Load all TOTP keys from the encrypted JSON file."""
