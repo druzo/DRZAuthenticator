@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# DEV ONLY — use install.sh for end-user install
 # Setup script for TOTP Application
 # Install required dependencies
 

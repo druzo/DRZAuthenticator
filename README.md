@@ -6,17 +6,17 @@ The DRZAuthenticator application includes full internationalization support with
 
 ## Installation
 
-The language support is already included in the application's source code. No additional installation steps are required beyond the standard setup:
+Install DRZAuthenticator with one command:
 
-1. Clone or download the repository
-2. Install required Python packages:
-   ```bash
-   pip install -r requirements.txt
-   ```
-3. Run the application:
-   ```bash
-   python src/main.py
-   ```
+```bash
+# Linux / macOS / WSL / Git Bash
+curl -fsSL https://raw.githubusercontent.com/druzo/DRZAuthenticator/v0.3.0/install.sh | bash
+
+# Windows PowerShell
+iwr -UseBasicParsing https://raw.githubusercontent.com/druzo/DRZAuthenticator/v0.3.0/install.ps1 | iex
+```
+
+> **Note**: Requires Python 3.8+ and Git. The installer supports `--update` and `--uninstall` subcommands.
 
 ## Usage Guide
 
