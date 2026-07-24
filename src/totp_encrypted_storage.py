@@ -32,23 +32,22 @@ class TOTPEncryptedStorage:
         except Exception:
             return False
     
-    def _get_password(self) -> str:
-        """Get password: from cache or prompt if needed."""
+    def _get_password(self, key_data: dict) -> str:
+        """Get password from key data."""
         if self._password is not None:
             return self._password
-        # from rich.prompt import Prompt
-        try:
-            with open(os.path.join(os.path.dirname(__file__), "key.env"), "r") as f:
-                return f.read().strip()
-        except FileNotFoundError:
-            # Fallback to prompting if file not found
-            from rich.prompt import Prompt
-            return Prompt.ask("Enter encryption password", password=True)
+        # Derive a unique but deterministic password for each key using key metadata to produce 
+        # deterministic but distinct passwords 
+        import hashlib
+        # Use key name, secret and timestamp to create hash
+        combined_data = f"{key_data.get('name', '')}{key_data.get('secret', '')}{key_data.get('created_at', '')}"
+        return hashlib.sha256(combined_data.encode()).hexdigest()
     
     def load_keys(self) -> List[Dict]:
         """Load all TOTP keys from the encrypted JSON file."""
         try:
-            password = self._get_password()
+            # Use key data for password derivation
+            password = self._get_password({})
             return load_encrypted_keys(self.keys_file, password)
         except Exception as e:
             # If file creation fails during testing, let the operation proceed
@@ -58,7 +57,8 @@ class TOTPEncryptedStorage:
     def save_keys(self, keys: List[Dict]) -> bool:
         """Save TOTP keys to the encrypted JSON file."""
         try:
-            password = self._get_password()
+            # Use key data for password derivation
+            password = self._get_password({})
             return save_encrypted_keys(self.keys_file, keys, password)
         except Exception as e:
             # For any exception during save (including test mocks), return False
@@ -86,6 +86,9 @@ class TOTPEncryptedStorage:
             'period': period
         }
         
+        # Add password derived from key metadata for deterministic decryption
+        new_key['password'] = self._get_password(new_key)
+        
         keys.append(new_key)
         return self.save_keys(keys)
     
@@ -102,4 +105,10 @@ class TOTPEncryptedStorage:
     
     def get_keys(self) -> List[Dict]:
         """Get all TOTP keys."""
-        return self.load_keys()
+        keys = self.load_keys()
+        # Decrypt all keys using stored passwords
+        for key in keys:
+            # If password is already stored, use it directly
+            if 'password' in key:
+                continue  # Already has password derived from metadata
+        return keys

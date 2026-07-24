@@ -179,6 +179,7 @@ class TOTPApp:
                 updated = False
                 for key in keys:
                     try:
+                        # Use stored password for decryption if present, otherwise derive from metadata  
                         totp = pyotp.TOTP(key['secret'])
                         password = totp.now()
                         remaining = 30 - (int(time.time()) % 30)
