@@ -13,7 +13,7 @@
     "prompt_select_option": "Select an option",
     "status_add_key": "[bold blue]Add New Authentication Key[/bold blue]",
     "status_show_passwords": "[bold blue]Current TOTP Passwords[/bold blue]",
-    "status_show_passwords_dynamic": "[bold blue]Current TOTP Passwords (Auto-updating) - Press Ctrl+C to return[/bold blue]",
+    "status_show_passwords_dynamic": "Current TOTP Passwords (Auto-updating) - Press Ctrl+C to return",
     "status_list_keys": "[bold blue]Stored TOTP Keys[/bold blue]",
     "status_remove_key": "[bold blue]Remove Authentication Key[/bold blue]",
     "status_help": "[bold blue]TOTP Application Help[/bold blue]",

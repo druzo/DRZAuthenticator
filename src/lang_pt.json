@@ -13,7 +13,7 @@
     "prompt_select_option": "Selecione uma opção",
     "status_add_key": "[bold blue]Adicionar Nova Chave de Autenticação[/bold blue]",
     "status_show_passwords": "[bold blue]Senhas TOTP Atuais[/bold blue]",
-    "status_show_passwords_dynamic": "[bold blue]Senhas TOTP Atuais (Atualização Automática) - Pressione Ctrl+C para retornar[/bold blue]",
+    "status_show_passwords_dynamic": "Senhas TOTP Atuais (Atualização Automática) - Pressione Ctrl+C para retornar",
     "status_list_keys": "[bold blue]Chaves TOTP Armazenadas[/bold blue]",
     "status_remove_key": "[bold blue]Remover Chave de Autenticação[/bold blue]",
     "status_help": "[bold blue]Ajuda da Aplicação TOTP[/bold blue]",

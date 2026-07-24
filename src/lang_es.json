@@ -13,7 +13,7 @@
     "prompt_select_option": "Seleccione una opción",
     "status_add_key": "[bold blue]Agregar Nueva Clave de Autenticación[/bold blue]",
     "status_show_passwords": "[bold blue]Contraseñas TOTP Actuales[/bold blue]",
-    "status_show_passwords_dynamic": "[bold blue]Contraseñas TOTP Actuales (Actualización Automática) - Presione Ctrl+C para volver[/bold blue]",
+    "status_show_passwords_dynamic": "Contraseñas TOTP Actuales (Actualización Automática) - Presione Ctrl+C para volver",
     "status_list_keys": "[bold blue]Claves TOTP Almacenadas[/bold blue]",
     "status_remove_key": "[bold blue]Eliminar Clave de Autenticación[/bold blue]",
     "status_help": "[bold blue]Ayuda de la Aplicación TOTP[/bold blue]",
