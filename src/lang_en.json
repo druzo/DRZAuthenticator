@@ -35,5 +35,6 @@
     "table_header_created": "Created At",
     "table_cell_valid": "Valid",
     "table_cell_expired": "Expired",
-    "nav_hint": "↑/↓ navigate • Enter select • q back"
+    "nav_hint": "↑/↓ navigate • Enter select • q back",
+    "password_select_hint": "Press q to return"
 }

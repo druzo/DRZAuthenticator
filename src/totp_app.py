@@ -1,13 +1,17 @@
 import time
 import json
 import os
+import threading
 import pyotp
-from rich.console import Console
+import readchar
+from rich.console import Console, Group
 from rich.table import Table
 from rich.panel import Panel
 from rich.prompt import Prompt
 from rich.align import Align
 from rich.box import ROUNDED
+from rich.live import Live
+from rich.text import Text
 from rich import print
 from totp_encrypted_storage import TOTPEncryptedStorage
 from ui_theme import (
@@ -27,7 +31,7 @@ class TOTPApp:
         self.language = "en"  # Default language
         self.translations = {}
         self.load_language(self.language)
-    
+
     def clear_screen(self):
         """Clear the terminal screen."""
         self.console.clear()
@@ -143,74 +147,85 @@ class TOTPApp:
             
         time.sleep(2)
     
+    def _build_password_frame(self, keys, phase: float = 0.0) -> Group:
+        """Build a single frame: banner + password table."""
+        banner = render_banner_panel(phase)
+
+        table = Table(
+            title=self.get_text("table_header_name"),
+            show_header=True,
+            header_style=f"bold {PALETTE['lavender']}",
+            border_style=PALETTE["border"],
+            box=ROUNDED,
+            style=f"on {PALETTE['panel']}",
+        )
+        table.add_column("#", style=PALETTE["text_dim"], width=3)
+        table.add_column(self.get_text("table_header_name"), style=PALETTE["sky"])
+        table.add_column(self.get_text("table_header_password"), style=f"bold {PALETTE['mint']}")
+        table.add_column(self.get_text("table_header_expires"), style=PALETTE["lavender"])
+        table.add_column(self.get_text("table_header_status"), style=PALETTE["peach"])
+
+        for i, key in enumerate(keys, 1):
+            try:
+                totp = pyotp.TOTP(key['secret'])
+                password = totp.now()
+                remaining = 30 - (int(time.time()) % 30)
+                bar_len = 16
+                filled = int(bar_len * remaining / 30)
+                bar = "[" + "█" * filled + "░" * (bar_len - filled) + f"] {remaining:02d}s"
+                status = self.get_text("table_cell_valid") if remaining > 0 else self.get_text("table_cell_expired")
+                table.add_row(str(i), key['name'], password, bar, status)
+            except Exception as e:
+                table.add_row(str(i), key['name'], "[err]Error[/err]", "N/A", f"[err]{str(e)}[/err]")
+
+        header = Text(self.get_text("status_show_passwords_dynamic"), style=f"bold {PALETTE['sky']}")
+        hint = Text(self.get_text("password_select_hint"), style=f"italic {PALETTE['text_dim']}")
+
+        elements = [
+            Align.center(banner),
+            Align.center(header),
+            Align.center(table),
+            Align.center(hint),
+        ]
+
+        return Group(*elements)
+
     def show_passwords(self):
-        """Display all passwords with dynamic updates."""
-        self.clear_screen()
-        self.print_banner()
-        self.print_centered(self.get_text("status_show_passwords"))
-        
+        """Display all passwords with live updates (no blink)."""
         keys = self.storage.get_keys()
         if not keys:
             self.print_centered(f"[warn]{self.get_text('error_no_keys_found')}[/warn]")
             time.sleep(2)
             return
-            
+
+        self.console.show_cursor(False)
+        phase = 0.0
+        frame = self._build_password_frame(keys, phase)
+
         try:
-            while True:
-                self.clear_screen()
-                self.print_banner()
-                self.print_centered(self.get_text("status_show_passwords_dynamic"))
-                print()
-                
-                # Create table for current passwords
-                table = Table(
-                    title=self.get_text("table_header_name"),
-                    show_header=True,
-                    header_style=f"bold {PALETTE['lavender']}",
-                    border_style=PALETTE["border"],
-                    box=ROUNDED,
-                    style=f"on {PALETTE['panel']}",
-                )
-                table.add_column(self.get_text("table_header_name"), style=PALETTE["sky"])
-                table.add_column(self.get_text("table_header_password"), style=f"bold {PALETTE['mint']}")
-                table.add_column(self.get_text("table_header_expires"), style=PALETTE["lavender"])
-                table.add_column(self.get_text("table_header_status"), style=PALETTE["peach"])
-                
-                updated = False
-                for key in keys:
-                    try:
-                        # Use stored password for decryption if present, otherwise derive from metadata  
-                        totp = pyotp.TOTP(key['secret'])
-                        password = totp.now()
-                        remaining = 30 - (int(time.time()) % 30)
-                        # pastel progress bar for the countdown
-                        bar_len = 16
-                        filled = int(bar_len * remaining / 30)
-                        bar = "[" + "█" * filled + "░" * (bar_len - filled) + f"] {remaining:02d}s"
-                        status = self.get_text("table_cell_valid") if remaining > 0 else self.get_text("table_cell_expired")
-                        
-                        table.add_row(
-                            key['name'],
-                            password,
-                            bar,
-                            status
-                        )
-                        updated = True
-                    except Exception as e:
-                        table.add_row(key['name'], "[err]Error[/err]", "N/A", f"[err]{str(e)}[/err]")
-                
-                self.console.print(Align.center(table))
-                
-                if not updated:
-                    self.print_centered(f"[warn]{self.get_text('error_no_passwords')}[/warn]")
-                
-                try:
-                    time.sleep(1)  # Update every second to show countdown
-                    # Check if user wants to exit (Ctrl+C)
-                except KeyboardInterrupt:
-                    break
+            with Live(frame, console=self.console, refresh_per_second=4, transient=True, screen=False) as live:
+                stop_event = threading.Event()
+
+                def tick():
+                    nonlocal phase
+                    while not stop_event.is_set():
+                        phase = (phase + 0.08) % 1.0
+                        live.update(self._build_password_frame(keys, phase))
+                        stop_event.wait(1)
+
+                timer = threading.Thread(target=tick, daemon=True)
+                timer.start()
+
+                while True:
+                    key = readchar.readkey()
+
+                    if key in ("q", "Q", readchar.key.ESC, readchar.key.CTRL_C):
+                        break
+
         except KeyboardInterrupt:
-            return
+            pass
+        finally:
+            self.console.show_cursor(True)
     
     def list_keys(self):
         """List all stored keys."""

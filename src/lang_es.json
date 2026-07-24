@@ -35,5 +35,6 @@
     "table_header_created": "Creado El",
     "table_cell_valid": "Válido",
     "table_cell_expired": "Expirado",
-    "nav_hint": "↑/↓ navegar • Enter seleccionar • q volver"
+    "nav_hint": "↑/↓ navegar • Enter seleccionar • q volver",
+    "password_select_hint": "Presione q para volver"
 }
