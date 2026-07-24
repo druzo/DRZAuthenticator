@@ -36,5 +36,6 @@
     "table_cell_valid": "Valid",
     "table_cell_expired": "Expired",
     "nav_hint": "↑/↓ navigate • Enter select • q back",
-    "password_select_hint": "Press q to return"
+    "password_select_hint": "↑/↓ navigate • Enter copy password • q back",
+    "password_copied_hint": "Copied to clipboard!"
 }

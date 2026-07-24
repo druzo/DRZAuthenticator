@@ -171,3 +171,25 @@ def test_run_menu():
          patch.object(app, 'print_centered'):
         # Should not raise exception
         app.run()
+
+def test_build_password_hint_no_copy():
+    """Test password hint building without copy feedback."""
+    app = TOTPApp()
+    hint_text = app._build_password_hint(None)
+    assert "↑/↓ navigate • Enter copy password • q back" in str(hint_text)  # Default hint
+
+def test_build_password_hint_copied():
+    """Test password hint building with recent copy feedback."""
+    app = TOTPApp()
+    # Simulate copied just now
+    import time
+    now = time.time()
+    hint_text = app._build_password_hint(now)
+    assert "Copied to clipboard!" in str(hint_text)
+
+def test_build_password_frame():
+    """Test password frame building produces valid Group object."""
+    app = TOTPApp()
+    keys = [{'name': 'TestKey', 'secret': 'JBSWY3DPEHPK3PXP'}]
+    frame = app._build_password_frame(keys, phase=0.0, selected_index=0, copied_time=None)
+    assert frame is not None

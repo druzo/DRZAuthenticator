@@ -1,6 +1,7 @@
 import time
 import json
 import os
+import pyperclip
 import threading
 import pyotp
 import readchar
@@ -147,7 +148,7 @@ class TOTPApp:
             
         time.sleep(2)
     
-    def _build_password_frame(self, keys, phase: float = 0.0) -> Group:
+    def _build_password_frame(self, keys, phase: float = 0.0, selected_index: int = None, copied_time: float = None) -> Group:
         """Build a single frame: banner + password table."""
         banner = render_banner_panel(phase)
 
@@ -174,13 +175,19 @@ class TOTPApp:
                 filled = int(bar_len * remaining / 30)
                 bar = "[" + "█" * filled + "░" * (bar_len - filled) + f"] {remaining:02d}s"
                 status = self.get_text("table_cell_valid") if remaining > 0 else self.get_text("table_cell_expired")
-                table.add_row(str(i), key['name'], password, bar, status)
+                
+                # Highlight selected row (selected_index is 0-indexed)
+                if selected_index is not None and (i - 1) == selected_index:
+                    row_style = f"bold {PALETTE['peach']}"
+                    table.add_row(str(i), key['name'], password, bar, status, style=row_style)
+                else:
+                    table.add_row(str(i), key['name'], password, bar, status)
             except Exception as e:
                 table.add_row(str(i), key['name'], "[err]Error[/err]", "N/A", f"[err]{str(e)}[/err]")
 
         header = Text(self.get_text("status_show_passwords_dynamic"), style=f"bold {PALETTE['sky']}")
-        hint = Text(self.get_text("password_select_hint"), style=f"italic {PALETTE['text_dim']}")
-
+        hint = self._build_password_hint(copied_time)
+        
         elements = [
             Align.center(banner),
             Align.center(header),
@@ -189,6 +196,14 @@ class TOTPApp:
         ]
 
         return Group(*elements)
+    
+    def _build_password_hint(self, copied_time: float = None) -> Text:
+        """Build hint text with optional copied feedback."""
+        if copied_time and time.time() - copied_time < 2.0:
+            # Show "Copied!" for ~2 seconds after copy
+            return Text(self.get_text("password_copied_hint"), style=f"bold {PALETTE['mint']}")
+        else:
+            return Text(self.get_text("password_select_hint"), style=f"italic {PALETTE['text_dim']}")
 
     def show_passwords(self):
         """Display all passwords with live updates (no blink)."""
@@ -200,18 +215,22 @@ class TOTPApp:
 
         self.console.show_cursor(False)
         phase = 0.0
-        frame = self._build_password_frame(keys, phase)
+        selected_index = 0
+        copied_time = None  # Track when password was copied
+        
+        # Initial frame creation
+        frame = self._build_password_frame(keys, phase, selected_index, copied_time)
 
         try:
             with Live(frame, console=self.console, refresh_per_second=4, transient=True, screen=False) as live:
                 stop_event = threading.Event()
 
                 def tick():
-                    nonlocal phase
+                    nonlocal phase, copied_time
                     while not stop_event.is_set():
                         phase = (phase + 0.08) % 1.0
-                        live.update(self._build_password_frame(keys, phase))
-                        stop_event.wait(1)
+                        live.update(self._build_password_frame(keys, phase, selected_index, copied_time))
+                        stop_event.wait(0.25)  # 4 fps updates
 
                 timer = threading.Thread(target=tick, daemon=True)
                 timer.start()
@@ -220,7 +239,25 @@ class TOTPApp:
                     key = readchar.readkey()
 
                     if key in ("q", "Q", readchar.key.ESC, readchar.key.CTRL_C):
+                        stop_event.set()
                         break
+                    elif key in (readchar.key.UP, "k"):
+                        selected_index = (selected_index - 1) % len(keys)
+                        live.update(self._build_password_frame(keys, phase, selected_index, copied_time))
+                    elif key in (readchar.key.DOWN, "j"):
+                        selected_index = (selected_index + 1) % len(keys)
+                        live.update(self._build_password_frame(keys, phase, selected_index, copied_time))
+                    elif key in (readchar.key.ENTER, readchar.key.RIGHT, "l"):
+                        # Copy password to clipboard
+                        try:
+                            secret = keys[selected_index]['secret']
+                            totp = pyotp.TOTP(secret)
+                            password = totp.now()
+                            pyperclip.copy(password)
+                            copied_time = time.time()  # Mark when copy happened
+                            live.update(self._build_password_frame(keys, phase, selected_index, copied_time))
+                        except Exception:
+                            pass  # Silently fail if copy fails
 
         except KeyboardInterrupt:
             pass
